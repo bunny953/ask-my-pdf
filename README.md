@@ -1,5 +1,3 @@
-# ask-my-pdf
-A beginner-friendly API to upload PDFs and ask questions using Retrieval-Augmented Generation (RAG).
 # Ask My PDF 📄🤖
 
 **Ask My PDF** is a lightweight Retrieval-Augmented Generation (RAG) backend API. It allows users to upload PDF documents and ask questions about the content, receiving AI-generated answers based strictly on the document's text.
