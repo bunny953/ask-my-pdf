@@ -4,12 +4,21 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 import io
-import os
 
 app = FastAPI()
 
 CHROMA_DIR = "./chroma_db"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
+embeddings = HuggingFaceEmbeddings(
+    model_name=EMBEDDING_MODEL
+)
+
+vector_store = Chroma(
+    collection_name="pdf_documents",
+    embedding_function=embeddings,
+    persist_directory=CHROMA_DIR,
+)
 
 
 def store_text_in_vector_db(text: str, filename: str) -> int:
@@ -25,17 +34,21 @@ def store_text_in_vector_db(text: str, filename: str) -> int:
         metadatas=[{"source": filename}],
     )
 
-    embeddings = HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL
+    # Remove previously stored chunks for the same file
+    vector_store.delete(
+        where={"source": filename}
     )
 
-    vector_store = Chroma(
-        collection_name="pdf_documents",
-        embedding_function=embeddings,
-        persist_directory=CHROMA_DIR,
-    )
+    # Use deterministic IDs so each filename/chunk pair is identifiable
+    chunk_ids = [
+        f"{filename}_{index}"
+        for index in range(len(chunks))
+    ]
 
-    vector_store.add_documents(chunks)
+    vector_store.add_documents(
+        documents=chunks,
+        ids=chunk_ids,
+    )
 
     return len(chunks)
 
@@ -46,15 +59,8 @@ def health_check():
 
 
 @app.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
-    os.makedirs("temp", exist_ok=True)
-
-    file_bytes = await file.read()
-
-    file_path = os.path.join("temp", file.filename)
-
-    with open(file_path, "wb") as buffer:
-        buffer.write(file_bytes)
+def upload_pdf(file: UploadFile = File(...)):
+    file_bytes = file.file.read()
 
     reader = PdfReader(io.BytesIO(file_bytes))
 
